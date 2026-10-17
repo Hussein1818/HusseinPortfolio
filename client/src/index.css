@@ -1,0 +1,122 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --torch-x: 50vw;
+    --torch-y: 35vh;
+    --font-display: 'Cinzel', serif;
+    --font-sans: 'Plus Jakarta Sans', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  @media (pointer: fine) {
+    body, a, button, input, textarea {
+      cursor: none !important;
+    }
+  }
+
+  body {
+    background-color: #050403;
+    color: #e5dec9;
+    overflow-x: hidden;
+    font-family: var(--font-sans);
+    background-image: 
+      linear-gradient(to bottom, rgba(5, 4, 3, 0.88), rgba(5, 4, 3, 0.95)),
+      url('/assets/images/cave-wall.jpg');
+    background-size: 520px 520px;
+    background-attachment: fixed;
+  }
+
+  h1, h2, h3, h4, .font-dungeon {
+    font-family: var(--font-display);
+    letter-spacing: 0.04em;
+  }
+
+  code, pre, .font-code {
+    font-family: var(--font-mono);
+  }
+}
+
+@keyframes flameDance {
+  0%, 100% { transform: scale(1) rotate(-2deg); }
+  25% { transform: scale(1.08, 0.96) rotate(2deg); }
+  50% { transform: scale(0.95, 1.06) rotate(-1deg); }
+  75% { transform: scale(1.04, 1.02) rotate(3deg); }
+}
+
+@keyframes ghostFloat {
+  0%, 100% { transform: translate(0, 0); }
+  33% { transform: translate(40px, -25px); }
+  66% { transform: translate(-30px, 20px); }
+}
+
+@keyframes firePerimeterTravel {
+  0% {
+    stroke-dashoffset: 100;
+    opacity: 1;
+    filter: drop-shadow(0 0 12px #f59e0b) drop-shadow(0 0 24px #dc2626);
+  }
+  75% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+    filter: drop-shadow(0 0 22px #fbbf24) drop-shadow(0 0 40px #ea580c);
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+    filter: drop-shadow(0 0 0px transparent);
+  }
+}
+
+@keyframes fireFlashBurst {
+  0% {
+    opacity: 0.85;
+    box-shadow: inset 0 0 90px rgba(245, 158, 11, 0.65), 0 0 70px rgba(234, 88, 12, 0.6);
+  }
+  100% {
+    opacity: 0;
+    box-shadow: inset 0 0 0 transparent, 0 0 0 transparent;
+  }
+}
+
+.flame-animated {
+  animation: flameDance 0.42s infinite ease-in-out;
+  transform-origin: bottom center;
+}
+
+.ghost-explorer {
+  animation: ghostFloat 9s infinite ease-in-out;
+}
+
+.fire-stroke-anim {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  animation: firePerimeterTravel 1.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.fire-burst-overlay {
+  animation: fireFlashBurst 1.45s ease-out forwards;
+}
+
+.chamber-dark-shroud {
+  position: relative;
+  z-index: 10;
+  filter: brightness(0.11) contrast(0.95) saturate(0.25);
+  transition: filter 0.8s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.8s ease, box-shadow 0.8s ease;
+}
+
+.chamber-illuminated {
+  position: relative;
+  z-index: 35;
+  filter: brightness(1) contrast(1) saturate(1);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.95), 0 0 45px rgba(245, 158, 11, 0.14);
+  transition: filter 0.85s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.85s ease, box-shadow 0.85s ease;
+}
+
+.dungeon-portrait-filter {
+  filter: contrast(1.16) brightness(0.94) sepia(0.22) saturate(1.12);
+}
