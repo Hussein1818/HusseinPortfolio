@@ -384,7 +384,7 @@ export const App: React.FC = () => {
   }, [triggerToast]);
 
   const igniteChamber = useCallback(
-    (chamberId: ChamberId, chamberName: string) => {
+    (chamberId: ChamberId, _chamberName: string) => {
       setLitChambers((prev) => {
         if (prev.has(chamberId)) return prev;
 
