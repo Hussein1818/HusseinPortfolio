@@ -98,17 +98,6 @@ export const App: React.FC = () => {
     () => new Set<string>()
   );
 
-  const [visitorQueryName, setVisitorQueryName] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return null;
-    const params = new URLSearchParams(window.location.search);
-    return (
-      params.get('name') ||
-      params.get('visitor') ||
-      params.get('company') ||
-      params.get('recruiter')
-    );
-  });
-
   const triggerToast = useCallback((message: string) => {
     setAchievementToast(message);
   }, []);
@@ -277,16 +266,6 @@ export const App: React.FC = () => {
       }
       return next;
     });
-  }, [triggerToast]);
-
-  const handleSimulateQueryLink = useCallback(() => {
-    dungeonAudio.playRuneCollect();
-    const sampleVisitor = 'Tech Lead & Engineering Team';
-    const url = new URL(window.location.href);
-    url.searchParams.set('name', sampleVisitor);
-    window.history.pushState({}, '', url.toString());
-    setVisitorQueryName(sampleVisitor);
-    triggerToast('Custom URL Parameter Active: ?name=Tech+Lead');
   }, [triggerToast]);
 
   const handleBossAttack = useCallback(
