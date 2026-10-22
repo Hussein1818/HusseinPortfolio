@@ -493,3 +493,16 @@ scraper/venv/
 scraper/.env
 scraper/__pycache__/
 *.pyc
+
+# .NET Build & Temp Files
+[Bb]in/
+[Oo]bj/
+.vs/
+*.user
+*.suo
+appsettings.Production.json
+
+# Node & Vite Build Files
+node_modules/
+dist/
+.env.local

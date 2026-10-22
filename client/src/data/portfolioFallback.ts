@@ -7,8 +7,9 @@ export const HUSSEIN_DATA: PortfolioData = {
     location: 'Cairo, Egypt',
     email: 'issehs023@gmail.com',
     phone: '+201288239524',
-    githubUrl: 'https://github.com',
-    linkedinUrl: 'https://linkedin.com',
+    githubUrl: 'https://github.com/Hussein1818',
+    linkedinUrl:
+      'https://www.linkedin.com/in/hussein-mohamed-21b214315?utm_source=share_via&utm_content=profile&utm_medium=member_android',
     dungeonAvatar: '/assets/images/hussein-dungeon.jpg',
     recruiterAvatar: '/assets/images/hussein-hr.png',
     summary:
@@ -22,9 +23,9 @@ export const HUSSEIN_DATA: PortfolioData = {
   relics: [
     {
       id: 'medaura',
-      name: 'Citadel of MedAura',
+      name: 'MedAura',
       role: 'Freelance .NET Backend Developer',
-      period: '2022 – 2026',
+      period: '2026',
       type: 'Commercial Medical E-Learning (Google Play)',
       imageUrl: '/assets/images/relic-medaura.png',
       secretArchitecture:
@@ -49,11 +50,11 @@ export const HUSSEIN_DATA: PortfolioData = {
         'Cloudflare R2',
         'FFmpeg',
       ],
-      liveUrl: 'https://play.google.com',
+      liveUrl: 'https://play.google.com/store/apps/details?id=com.medaura.app',
     },
     {
       id: 'torostack',
-      name: 'Arena of Torostack',
+      name: 'Torostack',
       role: 'Graduation Project',
       period: 'Grade: Excellent',
       type: 'Real-Time 1v1 Competitive Coding Platform',
@@ -78,11 +79,11 @@ export const HUSSEIN_DATA: PortfolioData = {
         'Clean Architecture',
         'Python AI',
       ],
-      liveUrl: '#torostack-demo',
+      liveUrl: 'https://torostack.me/',
     },
     {
       id: 'ticketok',
-      name: 'Gate of TicketOk',
+      name: 'TicketOk',
       role: 'Backend Developer',
       period: 'High-Traffic System',
       type: 'Comprehensive Event Ticketing Platform',
@@ -107,11 +108,11 @@ export const HUSSEIN_DATA: PortfolioData = {
         'MediatR',
         'CI/CD',
       ],
-      liveUrl: '#ticketok-demo',
+      liveUrl: 'https://ticket-booking-alpha-ten.vercel.app/',
     },
     {
       id: 'sh-supplements',
-      name: 'Vault of SH-Supplements',
+      name: 'SH-Supplements',
       role: 'Backend Architect',
       period: 'Commercial Ecosystem',
       type: 'E-Commerce & Health Ecosystem',
@@ -135,7 +136,7 @@ export const HUSSEIN_DATA: PortfolioData = {
         'SignalR',
         'MediatR',
       ],
-      liveUrl: '#sh-supplements-demo',
+      liveUrl: 'https://sh-supplements.vercel.app/',
     },
   ],
   runes: [
@@ -197,7 +198,7 @@ export const HUSSEIN_DATA: PortfolioData = {
     {
       id: 'concurrency-shield',
       label: 'Deploy Optimistic Concurrency Control',
-      projectOrigin: 'SH-Supplements Architecture',
+      projectOrigin: 'SH-Supplements',
       impactDescription:
         'Eliminated race conditions and prevented flash-sale overselling under heavy load.',
       damage: 40,
@@ -205,7 +206,7 @@ export const HUSSEIN_DATA: PortfolioData = {
     {
       id: 'seat-lock-strike',
       label: 'Trigger Distributed Seat-Locking & Redis Cache',
-      projectOrigin: 'TicketOk Engine',
+      projectOrigin: 'TicketOk',
       impactDescription:
         'Handled massive concurrent booking spikes with sub-millisecond state locks.',
       damage: 35,
@@ -213,7 +214,7 @@ export const HUSSEIN_DATA: PortfolioData = {
     {
       id: 'hls-encryption-beam',
       label: 'Enforce HLS Encryption & Strict Device-Binding',
-      projectOrigin: 'MedAura Security Pipeline',
+      projectOrigin: 'MedAura',
       impactDescription:
         'Blocked unauthorized stream piracy and secured multi-device session tokens.',
       damage: 45,

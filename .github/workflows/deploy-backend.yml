@@ -1,0 +1,38 @@
+name: Deploy .NET 9 API to MonsterASP
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'server/**'
+      - '.github/workflows/deploy-backend.yml'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 9.0
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore & Publish API
+        run: dotnet publish server/API/API.csproj -c Release -o ./publish
+
+      - name: Deploy to MonsterASP via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: site100807.siteasp.net
+          username: site100807
+          password: ${{ secrets.MONSTER_FTP_PASSWORD }}
+          local-dir: ./publish/
+          server-dir: /wwwroot/
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/appsettings.Production.json

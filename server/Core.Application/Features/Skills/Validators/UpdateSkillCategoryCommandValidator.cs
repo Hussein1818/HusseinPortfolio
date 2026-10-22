@@ -1,0 +1,20 @@
+﻿using Core.Application.Features.Skills.Commands;
+using FluentValidation;
+
+namespace Core.Application.Features.Skills.Validators;
+
+public class UpdateSkillCategoryCommandValidator : AbstractValidator<UpdateSkillCategoryCommand>
+{
+    public UpdateSkillCategoryCommandValidator()
+    {
+        RuleFor(v => v.Id)
+            .NotEmpty().WithMessage("Category ID is required.");
+
+        RuleFor(v => v.Name)
+            .NotEmpty().WithMessage("Category name is required.")
+            .MaximumLength(100).WithMessage("Category name must not exceed 100 characters.");
+
+        RuleFor(v => v.RuneSymbol)
+            .MaximumLength(10).WithMessage("Rune symbol must not exceed 10 characters.");
+    }
+}
