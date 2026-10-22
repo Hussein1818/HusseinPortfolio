@@ -129,7 +129,8 @@ builder.Services.AddRateLimiter(options =>
 // ==========================================
 // 6. CORS Configuration (SignalR Compatible)
 // ==========================================
-var allowedOrigins = builder.Configuration.GetSection("CorsSettings:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
+var rawOrigins = builder.Configuration.GetSection("CorsSettings:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
+var allowedOrigins = Array.ConvertAll(rawOrigins, o => o.Trim().TrimEnd('/'));
 
 builder.Services.AddCors(options =>
 {
@@ -149,42 +150,47 @@ var app = builder.Build();
 
 app.UseMiddleware<GlobalExceptionMiddleware>();
 
-// Execute Migrations & Data Seeder for Admin Account
+// Execute Migrations & Data Seeder Safely on Startup
 using (var scope = app.Services.CreateScope())
 {
-    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await dbContext.Database.MigrateAsync();
-
-    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-    var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
-
-    var adminEmail = config["AdminSettings:Email"];
-    var adminPassword = config["AdminSettings:Password"];
-
-    if (!await roleManager.RoleExistsAsync("Admin"))
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    try
     {
-        await roleManager.CreateAsync(new IdentityRole("Admin"));
-    }
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await dbContext.Database.MigrateAsync();
 
-    if (await userManager.FindByEmailAsync(adminEmail!) == null)
-    {
-        var adminUser = new ApplicationUser
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+        var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+
+        var adminEmail = config["AdminSettings:Email"];
+        var adminPassword = config["AdminSettings:Password"];
+
+        if (!await roleManager.RoleExistsAsync("Admin"))
         {
-            UserName = adminEmail,
-            Email = adminEmail,
-            FullName = config["AdminSettings:FullName"]!
-        };
-        await userManager.CreateAsync(adminUser, adminPassword!);
-        await userManager.AddToRoleAsync(adminUser, "Admin");
+            await roleManager.CreateAsync(new IdentityRole("Admin"));
+        }
+
+        if (!string.IsNullOrWhiteSpace(adminEmail) && await userManager.FindByEmailAsync(adminEmail) == null)
+        {
+            var adminUser = new ApplicationUser
+            {
+                UserName = adminEmail,
+                Email = adminEmail,
+                FullName = config["AdminSettings:FullName"] ?? "Admin"
+            };
+            await userManager.CreateAsync(adminUser, adminPassword!);
+            await userManager.AddToRoleAsync(adminUser, "Admin");
+        }
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "An error occurred while migrating or seeding the database.");
     }
 }
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+app.UseSwagger();
+app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
 app.UseRouting();
@@ -192,6 +198,13 @@ app.UseCors("CorsPolicy");
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.MapGet("/", () => Results.Ok(new
+{
+    Service = "Hussein Portfolio API (.NET 9)",
+    Status = "Online",
+    Documentation = "/swagger"
+}));
 
 app.MapControllers();
 app.MapHub<PortfolioHub>("/hubs/portfolio");
