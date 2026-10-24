@@ -13,6 +13,7 @@ import { TerminalChamber } from './components/chambers/TerminalChamber';
 import { dungeonAudio } from './utils/dungeonAudio';
 import {
   portfolioApi,
+  guestbookOwnership,
   mapProjectDtoToRelic,
   mapCategoryDtoToRune,
   mapGuestbookDtoToEntry,
@@ -70,7 +71,6 @@ export const App: React.FC = () => {
   const [isLumosActive, setIsLumosActive] = useState<boolean>(false);
   const [isArcaneVision, setIsArcaneVision] = useState<boolean>(false);
 
-  // Live API Data with Instant Static Fallback
   const [relics, setRelics] = useState<readonly ProjectRelic[]>(
     HUSSEIN_DATA.relics
   );
@@ -78,7 +78,10 @@ export const App: React.FC = () => {
   const [guestbookEntries, setGuestbookEntries] = useState<
     readonly GuestbookEntry[]
   >(HUSSEIN_DATA.initialGuestbook);
-  const [activeExplorersCount, setActiveExplorersCount] = useState<number>(3);
+  const [ownedEntryIds, setOwnedEntryIds] = useState<ReadonlySet<string>>(
+    () => new Set(Object.keys(guestbookOwnership.getMap()))
+  );
+  const [activeExplorersCount, setActiveExplorersCount] = useState<number>(1);
 
   const [litChambers, setLitChambers] = useState<ReadonlySet<ChamberId>>(
     () => new Set<ChamberId>(['origin'])
@@ -116,7 +119,7 @@ export const App: React.FC = () => {
       if (Array.isArray(catDtos) && catDtos.length > 0) {
         setRunes(catDtos.map(mapCategoryDtoToRune));
       }
-      if (Array.isArray(gbDtos) && gbDtos.length > 0) {
+      if (Array.isArray(gbDtos)) {
         setGuestbookEntries(gbDtos.map(mapGuestbookDtoToEntry));
       }
     } catch {
@@ -136,6 +139,14 @@ export const App: React.FC = () => {
           if (prev.some((e) => e.id === newEntry.id)) return prev;
           return [newEntry, ...prev];
         });
+      },
+      onUpdateGuestbookEntry: (updatedEntry) => {
+        setGuestbookEntries((prev) =>
+          prev.map((e) => (e.id === updatedEntry.id ? updatedEntry : e))
+        );
+      },
+      onRemoveGuestbookEntry: (deletedId) => {
+        setGuestbookEntries((prev) => prev.filter((e) => e.id !== deletedId));
       },
     });
 
@@ -306,6 +317,10 @@ export const App: React.FC = () => {
         guildOrCompany,
         message
       );
+      if (createdDto.authorToken) {
+        guestbookOwnership.saveToken(createdDto.id, createdDto.authorToken);
+        setOwnedEntryIds(new Set(Object.keys(guestbookOwnership.getMap())));
+      }
       const mapped = mapGuestbookDtoToEntry(createdDto);
       setGuestbookEntries((prev) => {
         if (prev.some((e) => e.id === mapped.id)) return prev;
@@ -313,6 +328,49 @@ export const App: React.FC = () => {
       });
     },
     []
+  );
+
+  const handleUpdateOwnGuestbookEntry = useCallback(
+    async (
+      id: string,
+      explorerName: string,
+      guildOrCompany: string,
+      message: string
+    ) => {
+      const token = guestbookOwnership.getToken(id);
+      if (!token) throw new Error('You can only edit your own message.');
+      const updatedDto = await portfolioApi.updateGuestbookEntry(
+        id,
+        explorerName,
+        guildOrCompany,
+        message,
+        token
+      );
+      const mapped = mapGuestbookDtoToEntry(updatedDto);
+      setGuestbookEntries((prev) =>
+        prev.map((e) => (e.id === id ? mapped : e))
+      );
+    },
+    []
+  );
+
+  const handleDeleteOwnGuestbookEntry = useCallback(
+    async (id: string) => {
+      const token = guestbookOwnership.getToken(id);
+      if (!token) return;
+      try {
+        await portfolioApi.deleteGuestbookEntry(id, token);
+        guestbookOwnership.removeToken(id);
+        setOwnedEntryIds(new Set(Object.keys(guestbookOwnership.getMap())));
+        setGuestbookEntries((prev) => prev.filter((e) => e.id !== id));
+        triggerToast('Your message has been deleted.');
+      } catch (err) {
+        triggerToast(
+          err instanceof Error ? err.message : 'Failed to delete message.'
+        );
+      }
+    },
+    [triggerToast]
   );
 
   const handleOpenAdmin = useCallback(() => {
@@ -334,7 +392,7 @@ export const App: React.FC = () => {
       <Suspense
         fallback={
           <div className="admin-cursor-zone flex min-h-screen items-center justify-center bg-[#060504] font-code text-xs text-amber-300">
-            Loading Admin Control Center...
+            Loading...
           </div>
         }
       >
@@ -364,6 +422,7 @@ export const App: React.FC = () => {
 
       <OnboardingModal
         isOpen={showOnboarding}
+        explorerAvatar={HUSSEIN_DATA.hero.dungeonAvatar}
         onStartExploration={handleStartExploration}
         onSkipToFullLight={handleSkipToFullLight}
       />
@@ -399,6 +458,7 @@ export const App: React.FC = () => {
 
       <DungeonHeader
         heroName={HUSSEIN_DATA.hero.name}
+        explorerAvatar={HUSSEIN_DATA.hero.dungeonAvatar}
         litCount={litChambers.size}
         totalChambers={ALL_CHAMBERS.length}
         activeExplorersCount={activeExplorersCount}
@@ -451,7 +511,10 @@ export const App: React.FC = () => {
       <TerminalChamber
         hero={HUSSEIN_DATA.hero}
         initialGuestbook={guestbookEntries}
+        ownedEntryIds={ownedEntryIds}
         onSubmitGuestbookEntry={handleSubmitGuestbookEntry}
+        onUpdateOwnGuestbookEntry={handleUpdateOwnGuestbookEntry}
+        onDeleteOwnGuestbookEntry={handleDeleteOwnGuestbookEntry}
         isLit={isChamberLit('terminal')}
         isIgniting={ignitingChambers.has('terminal')}
         isSecretGateUnlocked={isSecretGateUnlocked}

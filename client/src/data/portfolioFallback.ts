@@ -220,20 +220,5 @@ export const HUSSEIN_DATA: PortfolioData = {
       damage: 45,
     },
   ],
-  initialGuestbook: [
-    {
-      id: 'gb-1',
-      explorerName: 'Tech Lead Explorer',
-      guildOrCompany: 'Enterprise Guild',
-      message: 'Impressive .NET 9 Clean Architecture and SignalR execution!',
-      timestamp: '2m ago',
-    },
-    {
-      id: 'gb-2',
-      explorerName: 'Senior Architect',
-      guildOrCompany: 'Cloud Citadel',
-      message: 'The HLS encryption & device-binding in MedAura is top-tier.',
-      timestamp: '14m ago',
-    },
-  ],
+  initialGuestbook: [],
 };

@@ -34,7 +34,9 @@ public class GetAllGuestbookEntriesQueryHandler : IRequestHandler<GetAllGuestboo
                 ExplorerName = e.ExplorerName,
                 GuildOrCompany = e.GuildOrCompany,
                 Message = e.Message,
-                CreatedAt = e.CreatedAt
+                CreatedAt = e.CreatedAt,
+                UpdatedAt = e.UpdatedAt,
+                AuthorToken = null
             }).ToList();
     }
 }

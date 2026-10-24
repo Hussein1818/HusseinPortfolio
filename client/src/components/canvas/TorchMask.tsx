@@ -11,70 +11,50 @@ export const TorchMask: React.FC<TorchMaskProps> = React.memo(
     const spotlightRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
-      let rafId: number | null = null;
-
       const updateTorchPosition = (clientX: number, clientY: number) => {
-        if (rafId !== null) return;
-
-        rafId = requestAnimationFrame(() => {
-          if (cursorRef.current) {
-            cursorRef.current.style.transform = `translate3d(${clientX}px, ${clientY}px, 0)`;
-          }
-          if (spotlightRef.current) {
-            spotlightRef.current.style.transform = `translate3d(${clientX}px, ${clientY}px, 0)`;
-          }
-          rafId = null;
-        });
+        if (cursorRef.current) {
+          cursorRef.current.style.transform = `translate3d(${clientX}px, ${clientY}px, 0)`;
+        }
+        if (spotlightRef.current) {
+          spotlightRef.current.style.setProperty('--torch-x', `${clientX}px`);
+          spotlightRef.current.style.setProperty('--torch-y', `${clientY}px`);
+        }
       };
 
-      const handleMouseMove = (event: MouseEvent) => {
+      const handlePointerMove = (event: PointerEvent) => {
         updateTorchPosition(event.clientX, event.clientY);
       };
 
-      const handleTouchMove = (event: TouchEvent) => {
-        if (event.touches.length > 0) {
-          updateTorchPosition(
-            event.touches[0].clientX,
-            event.touches[0].clientY
-          );
-        }
-      };
-
-      window.addEventListener('mousemove', handleMouseMove, { passive: true });
-      window.addEventListener('touchmove', handleTouchMove, { passive: true });
+      window.addEventListener('pointermove', handlePointerMove, {
+        passive: true,
+      });
 
       return () => {
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('touchmove', handleTouchMove);
-        if (rafId !== null) {
-          cancelAnimationFrame(rafId);
-        }
+        window.removeEventListener('pointermove', handlePointerMove);
       };
     }, []);
 
     const primaryFlameColor = isArcaneVision ? '#38bdf8' : '#f59e0b';
     const secondaryFlameColor = isArcaneVision ? '#8b5cf6' : '#dc2626';
     const coreTint = isArcaneVision
-      ? 'rgba(139, 92, 246, 0.16)'
-      : 'rgba(245, 158, 11, 0.14)';
+      ? 'rgba(139, 92, 246, 0.15)'
+      : 'rgba(245, 158, 11, 0.13)';
 
     return (
       <>
         {!isLumosActive && (
           <div
+            ref={spotlightRef}
             aria-hidden="true"
-            className="pointer-events-none fixed inset-0 z-30 overflow-hidden"
-          >
-            <div
-              ref={spotlightRef}
-              className="pointer-events-none absolute top-0 left-0 -ml-[2500px] -mt-[2500px] h-[5000px] w-[5000px]"
-              style={{
-                background: `radial-gradient(circle 310px at 2500px 2500px, ${coreTint} 0%, rgba(10, 8, 6, 0.7) 52%, rgba(3, 2, 2, 0.96) 100%)`,
-                willChange: 'transform',
-                transform: 'translate3d(50vw, 35vh, 0)',
-              }}
-            />
-          </div>
+            className="pointer-events-none fixed inset-0 z-30"
+            style={
+              {
+                '--torch-x': '50vw',
+                '--torch-y': '35vh',
+                background: `radial-gradient(circle 300px at var(--torch-x) var(--torch-y), ${coreTint} 0%, rgba(10, 8, 6, 0.72) 52%, rgba(3, 2, 2, 0.96) 100%)`,
+              } as React.CSSProperties
+            }
+          />
         )}
 
         <div
@@ -87,8 +67,8 @@ export const TorchMask: React.FC<TorchMaskProps> = React.memo(
           }}
         >
           <svg
-            width="44"
-            height="56"
+            width="42"
+            height="54"
             viewBox="0 0 46 58"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"

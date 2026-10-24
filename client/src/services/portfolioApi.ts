@@ -6,11 +6,12 @@ import type {
 
 const RAW_BASE_URL =
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ||
-  'https://localhost:7148';
+  'https://hussein-portfolio.runasp.net';
 
 export const API_ORIGIN = RAW_BASE_URL.replace(/\/+$/, '');
 const API_V1 = `${API_ORIGIN}/api/v1`;
 const TOKEN_STORAGE_KEY = 'hussein_portfolio_admin_jwt';
+const GUESTBOOK_TOKENS_KEY = 'hussein_portfolio_my_gb_tokens';
 
 export interface ApiProjectDto {
   readonly id: string;
@@ -61,6 +62,8 @@ export interface ApiGuestbookEntryDto {
   readonly guildOrCompany: string;
   readonly message: string;
   readonly createdAt: string;
+  readonly updatedAt?: string | null;
+  readonly authorToken?: string | null;
 }
 
 export interface CurrentAdminUserDto {
@@ -98,12 +101,42 @@ export const tokenStorage = {
   },
 };
 
+export const guestbookOwnership = {
+  getMap(): Record<string, string> {
+    if (typeof window === 'undefined') return {};
+    try {
+      const raw = window.localStorage.getItem(GUESTBOOK_TOKENS_KEY);
+      return raw ? (JSON.parse(raw) as Record<string, string>) : {};
+    } catch {
+      return {};
+    }
+  },
+  saveToken(entryId: string, authorToken: string): void {
+    if (typeof window === 'undefined' || !entryId || !authorToken) return;
+    const current = this.getMap();
+    current[entryId] = authorToken;
+    window.localStorage.setItem(GUESTBOOK_TOKENS_KEY, JSON.stringify(current));
+  },
+  getToken(entryId: string): string | null {
+    return this.getMap()[entryId] ?? null;
+  },
+  removeToken(entryId: string): void {
+    if (typeof window === 'undefined') return;
+    const current = this.getMap();
+    delete current[entryId];
+    window.localStorage.setItem(GUESTBOOK_TOKENS_KEY, JSON.stringify(current));
+  },
+};
+
 export function formatRelativeTimestamp(isoDate?: string): string {
   if (!isoDate) return 'Just now';
   const date = new Date(isoDate);
   if (Number.isNaN(date.getTime())) return 'Just now';
 
-  const diffSeconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+  const diffSeconds = Math.max(
+    0,
+    Math.floor((Date.now() - date.getTime()) / 1000)
+  );
   if (diffSeconds < 60) return 'Just now';
   const diffMinutes = Math.floor(diffSeconds / 60);
   if (diffMinutes < 60) return `${diffMinutes}m ago`;
@@ -139,13 +172,16 @@ export function mapCategoryDtoToRune(dto: ApiSkillCategoryDto): SkillRune {
   };
 }
 
-export function mapGuestbookDtoToEntry(dto: ApiGuestbookEntryDto): GuestbookEntry {
+export function mapGuestbookDtoToEntry(
+  dto: ApiGuestbookEntryDto
+): GuestbookEntry {
+  const baseTime = formatRelativeTimestamp(dto.updatedAt || dto.createdAt);
   return {
     id: dto.id,
     explorerName: dto.explorerName,
     guildOrCompany: dto.guildOrCompany || 'Visitor',
     message: dto.message,
-    timestamp: formatRelativeTimestamp(dto.createdAt),
+    timestamp: dto.updatedAt ? `${baseTime} (edited)` : baseTime,
   };
 }
 
@@ -176,7 +212,7 @@ async function requestJson<T>(
   const data = text ? (JSON.parse(text) as unknown) : null;
 
   if (!response.ok) {
-    if (response.status === 401) {
+    if (response.status === 401 && !headers.has('X-Author-Token')) {
       tokenStorage.clear();
     }
     const errPayload = data as ApiErrorPayload | null;
@@ -199,7 +235,6 @@ async function requestJson<T>(
 }
 
 export const portfolioApi = {
-  // Auth
   async login(email: string, password: string): Promise<string> {
     const res = await requestJson<{ token?: string; Token?: string }>(
       '/auth/login',
@@ -222,7 +257,6 @@ export const portfolioApi = {
     tokenStorage.clear();
   },
 
-  // Projects
   async getProjects(): Promise<ApiProjectDto[]> {
     return requestJson<ApiProjectDto[]>('/projects', { method: 'GET' });
   },
@@ -234,7 +268,10 @@ export const portfolioApi = {
     });
   },
 
-  async updateProject(id: string, payload: ProjectUpsertPayload): Promise<void> {
+  async updateProject(
+    id: string,
+    payload: ProjectUpsertPayload
+  ): Promise<void> {
     await requestJson(`/projects/${id}`, {
       method: 'PUT',
       body: JSON.stringify({ ...payload, id }),
@@ -247,7 +284,6 @@ export const portfolioApi = {
     });
   },
 
-  // Skills (Categories & Items)
   async getSkillCategories(): Promise<ApiSkillCategoryDto[]> {
     return requestJson<ApiSkillCategoryDto[]>('/skills/categories', {
       method: 'GET',
@@ -308,7 +344,6 @@ export const portfolioApi = {
     });
   },
 
-  // Guestbook
   async getGuestbookEntries(): Promise<ApiGuestbookEntryDto[]> {
     return requestJson<ApiGuestbookEntryDto[]>('/guestbook', {
       method: 'GET',
@@ -326,9 +361,35 @@ export const portfolioApi = {
     });
   },
 
-  async deleteGuestbookEntry(id: string): Promise<void> {
+  async updateGuestbookEntry(
+    id: string,
+    explorerName: string,
+    guildOrCompany: string,
+    message: string,
+    authorToken?: string | null
+  ): Promise<ApiGuestbookEntryDto> {
+    const headers: Record<string, string> = {};
+    if (authorToken) {
+      headers['X-Author-Token'] = authorToken;
+    }
+    return requestJson<ApiGuestbookEntryDto>(`/guestbook/${id}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ explorerName, guildOrCompany, message }),
+    });
+  },
+
+  async deleteGuestbookEntry(
+    id: string,
+    authorToken?: string | null
+  ): Promise<void> {
+    const headers: Record<string, string> = {};
+    if (authorToken) {
+      headers['X-Author-Token'] = authorToken;
+    }
     await requestJson(`/guestbook/${id}`, {
       method: 'DELETE',
+      headers,
     });
   },
 };

@@ -1,4 +1,7 @@
-﻿using System.Threading;
+﻿using System;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Core.Application.Features.Guestbook.DTOs;
 using Core.Application.Interfaces.Repositories;
@@ -29,11 +32,20 @@ public class CreateGuestbookEntryCommandHandler : IRequestHandler<CreateGuestboo
 
     public async Task<GuestbookEntryDto> Handle(CreateGuestbookEntryCommand request, CancellationToken cancellationToken)
     {
+        var rawTokenBytes = RandomNumberGenerator.GetBytes(32);
+        var rawToken = Convert.ToHexString(rawTokenBytes);
+        var tokenHash = ComputeSha256Hex(rawToken);
+
+        var guild = string.IsNullOrWhiteSpace(request.GuildOrCompany)
+            ? "Visitor"
+            : request.GuildOrCompany.Trim();
+
         var entry = new GuestbookEntry
         {
             ExplorerName = request.ExplorerName.Trim(),
-            GuildOrCompany = request.GuildOrCompany.Trim(),
-            Message = request.Message.Trim()
+            GuildOrCompany = guild,
+            Message = request.Message.Trim(),
+            AuthorTokenHash = tokenHash
         };
 
         await _guestbookRepository.AddAsync(entry, cancellationToken);
@@ -45,7 +57,15 @@ public class CreateGuestbookEntryCommandHandler : IRequestHandler<CreateGuestboo
             ExplorerName = entry.ExplorerName,
             GuildOrCompany = entry.GuildOrCompany,
             Message = entry.Message,
-            CreatedAt = entry.CreatedAt
+            CreatedAt = entry.CreatedAt,
+            UpdatedAt = entry.UpdatedAt,
+            AuthorToken = rawToken
         };
+    }
+
+    private static string ComputeSha256Hex(string input)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
+        return Convert.ToHexString(bytes);
     }
 }

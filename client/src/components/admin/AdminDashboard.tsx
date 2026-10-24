@@ -12,9 +12,10 @@ import {
   Sparkles,
   CheckCircle2,
   AlertTriangle,
- RefreshCw,
+  RefreshCw,
   Eye,
   EyeOff,
+  Upload,
 } from 'lucide-react';
 import {
   portfolioApi,
@@ -53,7 +54,7 @@ const EMPTY_PROJECT_FORM: ProjectFormState = {
   role: '',
   period: '',
   type: '',
-  imageUrl: '/assets/images/relic-medaura.png',
+  imageUrl: '',
   secretArchitecture: '',
   schemaDiagram: '',
   description: '',
@@ -61,6 +62,42 @@ const EMPTY_PROJECT_FORM: ProjectFormState = {
   deepDiveSpecsText: '',
   techStacksText: '',
 };
+
+async function compressImageFileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Failed to read image file.'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Invalid image file.'));
+      img.onload = () => {
+        const maxDim = 900;
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(reader.result as string);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/webp', 0.85));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onExitAdmin,
@@ -80,22 +117,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // Data States
   const [projects, setProjects] = useState<ApiProjectDto[]>([]);
   const [categories, setCategories] = useState<ApiSkillCategoryDto[]>([]);
   const [guestbook, setGuestbook] = useState<ApiGuestbookEntryDto[]>([]);
 
-  // Project Form State
   const [projectForm, setProjectForm] =
     useState<ProjectFormState>(EMPTY_PROJECT_FORM);
   const [isEditingProject, setIsEditingProject] = useState<boolean>(false);
 
-  // Skill Category Form State
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [categoryName, setCategoryName] = useState<string>('');
   const [categoryRune, setCategoryRune] = useState<string>('⚡');
 
-  // Skill Item Form State
   const [selectedCategoryIdForSkill, setSelectedCategoryIdForSkill] =
     useState<string>('');
   const [newSkillName, setNewSkillName] = useState<string>('');
@@ -158,7 +191,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setIsAuthenticated(true);
       setLoginPassword('');
       await fetchAllAdminData();
-      showBanner('success', 'Authenticated successfully via JWT.');
+      showBanner('success', 'Logged in successfully.');
     } catch (err) {
       showBanner(
         'error',
@@ -237,9 +270,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  // Project Handlers
   const handleSaveProject = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!projectForm.imageUrl.trim()) {
+      showBanner('error', 'Please upload a project image first.');
+      return;
+    }
+
     setIsSubmitting(true);
     setStatusBanner(null);
 
@@ -306,7 +343,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleDeleteProject = async (id: string, name: string) => {
-    if (!window.confirm(`Soft-delete project "${name}"?`)) return;
+    if (!window.confirm(`Delete project "${name}"?`)) return;
     setIsSubmitting(true);
     try {
       await portfolioApi.deleteProject(id);
@@ -323,7 +360,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  // Skill Category & Item Handlers
   const handleSaveCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -435,7 +471,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   if (authLoading) {
     return (
       <div className="admin-cursor-zone flex min-h-screen items-center justify-center bg-[#060504] text-amber-200 font-code">
-        Verifying Admin JWT Session...
+        Loading...
       </div>
     );
   }
@@ -484,7 +520,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 required
                 value={loginEmail}
                 onChange={(e) => setLoginEmail(e.target.value)}
-                placeholder="admin@husseinportfolio.com"
+                placeholder="issehs023@gmail.com"
                 className="w-full rounded-xl border border-amber-900/60 bg-black px-3.5 py-2.5 text-amber-100 focus:border-amber-400 focus:outline-none"
               />
             </div>
@@ -527,6 +563,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       </div>
     );
   }
+
   return (
     <div className="admin-cursor-zone min-h-screen bg-[#060504] text-[#e5dec9] pb-20">
       <header className="sticky top-0 z-50 border-b border-amber-900/40 bg-[#0b0907]/95 backdrop-blur-md px-6 py-4">
@@ -535,10 +572,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <Shield className="h-6 w-6 text-amber-400" />
             <div>
               <span className="font-code text-[10px] uppercase tracking-widest text-emerald-400 block">
-                AUTHENTICATED: {adminEmail}
+                ADMIN: {adminEmail}
               </span>
               <h1 className="text-lg font-extrabold text-amber-100">
-                PORTFOLIO CONTROL CENTER (CQRS + CLEAN ARCH)
+                PORTFOLIO DASHBOARD
               </h1>
             </div>
           </div>
@@ -678,7 +715,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block mb-1 text-amber-300">Project Name *</label>
+                  <label className="block mb-1 text-amber-300">
+                    Project Name *
+                  </label>
                   <input
                     type="text"
                     required
@@ -716,7 +755,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block mb-1 text-amber-300">Project Type</label>
+                  <label className="block mb-1 text-amber-300">
+                    Project Type
+                  </label>
                   <input
                     type="text"
                     value={projectForm.type}
@@ -731,16 +772,46 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block mb-1 text-amber-300">Image Path / URL</label>
-                  <input
-                    type="text"
-                    value={projectForm.imageUrl}
-                    onChange={(e) =>
-                      setProjectForm({ ...projectForm, imageUrl: e.target.value })
-                    }
-                    placeholder="/assets/images/relic-medaura.png"
-                    className="w-full rounded-xl border border-amber-900/60 bg-black px-3 py-2 text-amber-100"
-                  />
+                  <label className="block mb-1 text-amber-300">
+                    Project Image *
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <label className="flex-1 cursor-pointer inline-flex items-center justify-center gap-2 rounded-xl border border-amber-500/60 bg-amber-950/40 px-3 py-2 text-amber-200 hover:bg-amber-500 hover:text-black transition">
+                      <Upload className="h-4 w-4" />
+                      <span>Upload Image File</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          try {
+                            const dataUrl =
+                              await compressImageFileToDataUrl(file);
+                            setProjectForm((prev) => ({
+                              ...prev,
+                              imageUrl: dataUrl,
+                            }));
+                          } catch (err) {
+                            showBanner(
+                              'error',
+                              err instanceof Error
+                                ? err.message
+                                : 'Image upload failed.'
+                            );
+                          }
+                        }}
+                      />
+                    </label>
+                    {projectForm.imageUrl && (
+                      <img
+                        src={projectForm.imageUrl}
+                        alt="Preview"
+                        className="h-9 w-9 rounded-lg border border-amber-500/50 object-cover bg-black shrink-0"
+                      />
+                    )}
+                  </div>
                 </div>
                 <div>
                   <label className="block mb-1 text-amber-300">
@@ -750,7 +821,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     type="url"
                     value={projectForm.liveUrl}
                     onChange={(e) =>
-                      setProjectForm({ ...projectForm, liveUrl: e.target.value })
+                      setProjectForm({
+                        ...projectForm,
+                        liveUrl: e.target.value,
+                      })
                     }
                     placeholder="https://torostack.me/"
                     className="w-full rounded-xl border border-amber-900/60 bg-black px-3 py-2 text-amber-100"
@@ -795,7 +869,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <div>
-                <label className="block mb-1 text-amber-300">Description *</label>
+                <label className="block mb-1 text-amber-300">
+                  Description *
+                </label>
                 <textarea
                   rows={3}
                   required
@@ -864,8 +940,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="lg:col-span-7 space-y-4">
               {projects.length === 0 ? (
                 <div className="rounded-3xl border border-amber-900/40 bg-[#0e0b08] p-8 text-center font-code text-xs text-amber-300/80">
-                  No projects in SQL Server yet. Click &quot;Seed Default Portfolio
-                  Data&quot; in the top bar or create one using the form.
+                  No projects in SQL Server yet. Click &quot;Seed Default
+                  Portfolio Data&quot; in the top bar or create one using the
+                  form.
                 </div>
               ) : (
                 projects.map((proj) => (
@@ -874,16 +951,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     className="rounded-2xl border border-amber-800/50 bg-[#0e0b08] p-5 flex flex-col justify-between gap-4"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <span className="font-code text-xs text-amber-400">
-                          {proj.role} • {proj.period}
-                        </span>
-                        <h3 className="text-xl font-extrabold text-amber-50">
-                          {proj.name}
-                        </h3>
-                        <p className="font-code text-xs text-emerald-400">
-                          {proj.type}
-                        </p>
+                      <div className="flex items-center gap-3.5">
+                        {proj.imageUrl && (
+                          <img
+                            src={proj.imageUrl}
+                            alt={proj.name}
+                            className="h-14 w-14 rounded-xl border border-amber-500/40 object-cover bg-black shrink-0"
+                          />
+                        )}
+                        <div>
+                          <span className="font-code text-xs text-amber-400">
+                            {proj.role} • {proj.period}
+                          </span>
+                          <h3 className="text-xl font-extrabold text-amber-50">
+                            {proj.name}
+                          </h3>
+                          <p className="font-code text-xs text-emerald-400">
+                            {proj.type}
+                          </p>
+                        </div>
                       </div>
                       <div className="flex items-center gap-2 font-code text-xs">
                         <button
@@ -935,7 +1021,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               >
                 <div className="flex items-center justify-between border-b border-amber-900/40 pb-3">
                   <h2 className="text-sm font-extrabold text-amber-100">
-                    {categoryId ? 'UPDATE SKILL CATEGORY' : 'NEW SKILL CATEGORY'}
+                    {categoryId
+                      ? 'UPDATE SKILL CATEGORY'
+                      : 'NEW SKILL CATEGORY'}
                   </h2>
                   {categoryId && (
                     <button
@@ -1018,7 +1106,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
 
                 <div>
-                  <label className="block mb-1 text-amber-300">Skill Name *</label>
+                  <label className="block mb-1 text-amber-300">
+                    Skill Name *
+                  </label>
                   <input
                     type="text"
                     required

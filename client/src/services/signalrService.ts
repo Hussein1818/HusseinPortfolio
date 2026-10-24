@@ -13,6 +13,8 @@ import type { GuestbookEntry } from '../types/dungeon.types';
 interface PortfolioSignalRHandlers {
   readonly onActiveExplorersUpdated?: (count: number) => void;
   readonly onReceiveGuestbookEntry?: (entry: GuestbookEntry) => void;
+  readonly onUpdateGuestbookEntry?: (entry: GuestbookEntry) => void;
+  readonly onRemoveGuestbookEntry?: (id: string) => void;
 }
 
 export function createPortfolioHubConnection(
@@ -47,10 +49,22 @@ export function createPortfolioHubConnection(
       }
     });
 
+    connection.on('UpdateGuestbookEntry', (dto: ApiGuestbookEntryDto) => {
+      if (!isDisposed && dto) {
+        handlers.onUpdateGuestbookEntry?.(mapGuestbookDtoToEntry(dto));
+      }
+    });
+
+    connection.on('RemoveGuestbookEntry', (id: string) => {
+      if (!isDisposed && id) {
+        handlers.onRemoveGuestbookEntry?.(id);
+      }
+    });
+
     try {
       await connection.start();
     } catch {
-      // Silent fallback when backend server is offline in static preview mode
+      // Silent fallback when backend server is unreachable
     }
   };
 

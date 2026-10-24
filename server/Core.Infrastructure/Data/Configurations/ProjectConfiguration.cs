@@ -18,6 +18,25 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
             .IsRequired()
             .HasMaxLength(100);
 
+        builder.Property(p => p.Period)
+            .HasMaxLength(100);
+
+        builder.Property(p => p.Type)
+            .HasMaxLength(150);
+
+        builder.Property(p => p.ImageUrl)
+            .IsRequired();
+
+        builder.Property(p => p.SecretArchitecture)
+            .HasMaxLength(500);
+
+        builder.Property(p => p.SchemaDiagram)
+            .HasMaxLength(1000);
+
+        builder.Property(p => p.Description)
+            .IsRequired()
+            .HasMaxLength(2000);
+
         builder.Property(p => p.LiveUrl)
             .HasMaxLength(500);
 

@@ -21,6 +21,10 @@ public class GuestbookEntryConfiguration : IEntityTypeConfiguration<GuestbookEnt
             .IsRequired()
             .HasMaxLength(1000);
 
+        builder.Property(g => g.AuthorTokenHash)
+            .IsRequired()
+            .HasMaxLength(64);
+
         builder.HasQueryFilter(g => !g.IsDeleted);
     }
 }

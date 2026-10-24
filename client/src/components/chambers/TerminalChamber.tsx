@@ -12,6 +12,9 @@ import {
   GitBranch,
   Share2,
   FileDown,
+  Trash2,
+  Edit3,
+  X,
 } from 'lucide-react';
 import type {
   HeroProfile,
@@ -26,11 +29,19 @@ import { downloadOfficialCvPdf } from '../../utils/downloadCv';
 interface TerminalChamberProps {
   readonly hero: HeroProfile;
   readonly initialGuestbook: readonly GuestbookEntry[];
+  readonly ownedEntryIds?: ReadonlySet<string>;
   readonly onSubmitGuestbookEntry?: (
     explorerName: string,
     guildOrCompany: string,
     message: string
   ) => Promise<void>;
+  readonly onUpdateOwnGuestbookEntry?: (
+    id: string,
+    explorerName: string,
+    guildOrCompany: string,
+    message: string
+  ) => Promise<void>;
+  readonly onDeleteOwnGuestbookEntry?: (id: string) => Promise<void>;
   readonly isLit: boolean;
   readonly isIgniting: boolean;
   readonly isSecretGateUnlocked: boolean;
@@ -42,7 +53,10 @@ export const TerminalChamber: React.FC<TerminalChamberProps> = React.memo(
   ({
     hero,
     initialGuestbook,
+    ownedEntryIds,
     onSubmitGuestbookEntry,
+    onUpdateOwnGuestbookEntry,
+    onDeleteOwnGuestbookEntry,
     isLit,
     isIgniting,
     isSecretGateUnlocked,
@@ -58,6 +72,7 @@ export const TerminalChamber: React.FC<TerminalChamberProps> = React.memo(
     const [explorerName, setExplorerName] = useState<string>('');
     const [explorerGuild, setExplorerGuild] = useState<string>('');
     const [explorerMessage, setExplorerMessage] = useState<string>('');
+    const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
     const [isSending, setIsSending] = useState<boolean>(false);
 
     useEffect(() => {
@@ -71,55 +86,80 @@ export const TerminalChamber: React.FC<TerminalChamberProps> = React.memo(
       onToast('SQL QUERY EXECUTED: Unlocked Production Metrics!');
     }, [sqlPuzzleSolved, onToast]);
 
+    const handleCancelEdit = useCallback(() => {
+      setEditingEntryId(null);
+      setExplorerName('');
+      setExplorerGuild('');
+      setExplorerMessage('');
+    }, []);
+
     const handleSignGuestbook = useCallback(
       async (event: React.FormEvent) => {
         event.preventDefault();
-        if (!explorerName.trim() || !explorerMessage.trim() || isSending) return;
+        if (!explorerName.trim() || !explorerMessage.trim() || isSending)
+          return;
 
         dungeonAudio.playRuneCollect();
         const nameClean = explorerName.trim();
         const guildClean = explorerGuild.trim() || 'Visitor';
         const messageClean = explorerMessage.trim();
 
-        if (onSubmitGuestbookEntry) {
-          setIsSending(true);
-          try {
+        setIsSending(true);
+        try {
+          if (editingEntryId && onUpdateOwnGuestbookEntry) {
+            await onUpdateOwnGuestbookEntry(
+              editingEntryId,
+              nameClean,
+              guildClean,
+              messageClean
+            );
+            setEditingEntryId(null);
+            setExplorerName('');
+            setExplorerGuild('');
+            setExplorerMessage('');
+            onToast('Your message has been updated!');
+            return;
+          }
+
+          if (onSubmitGuestbookEntry) {
             await onSubmitGuestbookEntry(nameClean, guildClean, messageClean);
             setExplorerName('');
             setExplorerGuild('');
             setExplorerMessage('');
-            onToast('CQRS COMMAND EXECUTED: Message broadcast via SignalR!');
-          } catch (err) {
-            onToast(
-              err instanceof Error
-                ? err.message
-                : 'Failed to submit guestbook entry.'
-            );
-          } finally {
-            setIsSending(false);
+            onToast('Message added to Guestbook!');
+            return;
           }
-          return;
+
+          const newEntry: GuestbookEntry = {
+            id: `gb-${Date.now()}`,
+            explorerName: nameClean,
+            guildOrCompany: guildClean,
+            message: messageClean,
+            timestamp: 'Just now',
+          };
+
+          setGuestbook((prev) => [newEntry, ...prev]);
+          setExplorerName('');
+          setExplorerGuild('');
+          setExplorerMessage('');
+          onToast('Message added to Guestbook!');
+        } catch (err) {
+          onToast(
+            err instanceof Error
+              ? err.message
+              : 'Failed to process guestbook message.'
+          );
+        } finally {
+          setIsSending(false);
         }
-
-        const newEntry: GuestbookEntry = {
-          id: `gb-${Date.now()}`,
-          explorerName: nameClean,
-          guildOrCompany: guildClean,
-          message: messageClean,
-          timestamp: 'Just now ',
-        };
-
-        setGuestbook((prev) => [newEntry, ...prev]);
-        setExplorerName('');
-        setExplorerGuild('');
-        setExplorerMessage('');
-        onToast('Message added to Guestbook!');
       },
       [
         explorerName,
         explorerGuild,
         explorerMessage,
         isSending,
+        editingEntryId,
+        onUpdateOwnGuestbookEntry,
         onSubmitGuestbookEntry,
         onToast,
       ]
@@ -305,9 +345,22 @@ export const TerminalChamber: React.FC<TerminalChamberProps> = React.memo(
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
               <div className="lg:col-span-7 rounded-2xl border border-amber-800/50 bg-[#0d0a07] p-6 space-y-4">
-                <h3 className="text-lg font-bold text-amber-100">
-                  GUESTBOOK 
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-amber-100">
+                    GUESTBOOK
+                  </h3>
+                  {editingEntryId && (
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      className="inline-flex items-center gap-1 font-code text-xs text-amber-400 hover:underline"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      <span>Cancel Edit</span>
+                    </button>
+                  )}
+                </div>
+
                 <form
                   onSubmit={handleSignGuestbook}
                   className="grid grid-cols-1 sm:grid-cols-2 gap-3"
@@ -345,28 +398,78 @@ export const TerminalChamber: React.FC<TerminalChamberProps> = React.memo(
                       className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-4 py-2 font-code text-xs font-extrabold text-black hover:bg-amber-400 disabled:opacity-50"
                     >
                       <Send className="h-3.5 w-3.5" />
-                      <span>{isSending ? '...' : 'SEND'}</span>
+                      <span>
+                        {isSending
+                          ? '...'
+                          : editingEntryId
+                            ? 'UPDATE'
+                            : 'SEND'}
+                      </span>
                     </button>
                   </div>
                 </form>
 
-                <div className="max-h-44 overflow-y-auto space-y-2.5 pr-1 pt-2">
-                  {guestbook.map((entry) => (
-                    <div
-                      key={entry.id}
-                      className="rounded-xl border border-amber-950 bg-black/80 p-3 font-code text-xs"
-                    >
-                      <div className="flex items-center justify-between text-amber-400">
-                        <strong>
-                          {entry.explorerName} ({entry.guildOrCompany})
-                        </strong>
-                        <span className="text-[10px] opacity-60">
-                          {entry.timestamp}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-amber-100/90">{entry.message}</p>
+                <div className="max-h-48 overflow-y-auto space-y-2.5 pr-1 pt-2">
+                  {guestbook.length === 0 ? (
+                    <div className="rounded-xl border border-amber-950/60 bg-black/50 p-4 text-center font-code text-xs text-amber-300/60">
+                      Be the first to leave a message in the Guestbook!
                     </div>
-                  ))}
+                  ) : (
+                    guestbook.map((entry) => {
+                      const isMine = ownedEntryIds?.has(entry.id) ?? false;
+                      return (
+                        <div
+                          key={entry.id}
+                          className="rounded-xl border border-amber-950 bg-black/80 p-3 font-code text-xs"
+                        >
+                          <div className="flex items-center justify-between gap-2 text-amber-400">
+                            <strong>
+                              {entry.explorerName} ({entry.guildOrCompany})
+                            </strong>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] opacity-60">
+                                {entry.timestamp}
+                              </span>
+                              {isMine && (
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingEntryId(entry.id);
+                                      setExplorerName(entry.explorerName);
+                                      setExplorerGuild(entry.guildOrCompany);
+                                      setExplorerMessage(entry.message);
+                                    }}
+                                    className="inline-flex items-center gap-1 rounded border border-amber-500/40 bg-amber-950/40 px-2 py-0.5 text-[10px] text-amber-300 hover:bg-amber-500 hover:text-black transition"
+                                    title="Edit your message"
+                                  >
+                                    <Edit3 className="h-3 w-3" />
+                                    <span>Edit</span>
+                                  </button>
+                                  {onDeleteOwnGuestbookEntry && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        void onDeleteOwnGuestbookEntry(entry.id)
+                                      }
+                                      className="inline-flex items-center gap-1 rounded border border-red-500/40 bg-red-950/40 px-2 py-0.5 text-[10px] text-red-300 hover:bg-red-600 hover:text-white transition"
+                                      title="Delete your message"
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                      <span>Delete</span>
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <p className="mt-1 text-amber-100/90">
+                            {entry.message}
+                          </p>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
 

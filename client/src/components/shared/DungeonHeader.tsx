@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  Flame,
   Users,
   Eye,
   Sun,
@@ -9,9 +8,11 @@ import {
   HelpCircle,
   Shield,
 } from 'lucide-react';
+import { SmartImage } from './SmartImage';
 
 interface DungeonHeaderProps {
   readonly heroName: string;
+  readonly explorerAvatar: string;
   readonly litCount: number;
   readonly totalChambers: number;
   readonly activeExplorersCount?: number;
@@ -28,6 +29,7 @@ interface DungeonHeaderProps {
 export const DungeonHeader: React.FC<DungeonHeaderProps> = React.memo(
   ({
     heroName,
+    explorerAvatar,
     litCount,
     totalChambers,
     activeExplorersCount = 1,
@@ -44,8 +46,13 @@ export const DungeonHeader: React.FC<DungeonHeaderProps> = React.memo(
       <header className="sticky top-0 z-40 w-full border-b border-amber-900/40 bg-[#080604]/95">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-3.5">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-amber-500/50 bg-amber-950/50">
-              <Flame className="h-5 w-5 text-amber-400" />
+            <div className="h-11 w-11 shrink-0 overflow-hidden rounded-xl border-2 border-amber-500/70 bg-black">
+              <SmartImage
+                src={explorerAvatar}
+                alt={heroName}
+                fallbackType="avatar"
+                className="h-full w-full object-cover object-top"
+              />
             </div>
             <div>
               <span className="font-code text-[10px] uppercase tracking-widest text-amber-500 block">

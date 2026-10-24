@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { ShieldAlert, Flame } from 'lucide-react';
 
 interface SmartImageProps {
@@ -13,7 +13,21 @@ export const SmartImage: React.FC<SmartImageProps> = React.memo(
     const [attemptIndex, setAttemptIndex] = useState<number>(0);
     const [hasFailedAll, setHasFailedAll] = useState<boolean>(false);
 
+    useEffect(() => {
+      setAttemptIndex(0);
+      setHasFailedAll(false);
+    }, [src]);
+
     const candidatePaths = useMemo(() => {
+      if (!src) return [];
+      if (
+        src.startsWith('data:') ||
+        src.startsWith('blob:') ||
+        src.startsWith('http://') ||
+        src.startsWith('https://')
+      ) {
+        return [src];
+      }
       const baseWithoutExt = src.replace(/\.(jpg|jpeg|png|webp)$/i, '');
       return [
         src,
@@ -36,7 +50,7 @@ export const SmartImage: React.FC<SmartImageProps> = React.memo(
       });
     }, [candidatePaths.length]);
 
-    if (hasFailedAll) {
+    if (hasFailedAll || candidatePaths.length === 0) {
       if (fallbackType === 'boss') {
         return (
           <div
@@ -53,7 +67,7 @@ export const SmartImage: React.FC<SmartImageProps> = React.memo(
         <div
           className={`flex items-center justify-center bg-[#120f0c] text-amber-500 ${className}`}
         >
-          <Flame className="h-12 w-12 animate-pulse" />
+          <Flame className="h-10 w-10" />
         </div>
       );
     }
