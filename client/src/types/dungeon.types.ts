@@ -18,6 +18,7 @@ export interface HeroProfile {
   readonly recruiterAvatar: string;
   readonly summary: string;
   readonly education: EducationInfo;
+  readonly cvFileUrl?: string;
 }
 
 export interface ProjectRelic {

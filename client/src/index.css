@@ -12,8 +12,16 @@
   }
 
   @media (pointer: fine) {
-    body, a, button, input, textarea {
+    body:not(.admin-mode),
+    body:not(.admin-mode) a,
+    body:not(.admin-mode) button {
       cursor: none !important;
+    }
+
+    input,
+    textarea,
+    select {
+      cursor: text !important;
     }
   }
 
@@ -122,8 +130,14 @@
   cursor: auto !important;
 }
 
+.admin-cursor-zone input,
+.admin-cursor-zone textarea {
+  cursor: text !important;
+}
+
 .admin-cursor-zone button,
 .admin-cursor-zone a,
-.admin-cursor-zone select {
+.admin-cursor-zone select,
+.admin-cursor-zone label {
   cursor: pointer !important;
 }

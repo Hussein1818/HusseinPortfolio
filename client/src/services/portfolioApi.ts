@@ -1,6 +1,8 @@
 import type {
+  HeroProfile,
   ProjectRelic,
   SkillRune,
+  BossDefenseAction,
   GuestbookEntry,
 } from '../types/dungeon.types';
 
@@ -13,6 +15,64 @@ const API_V1 = `${API_ORIGIN}/api/v1`;
 const TOKEN_STORAGE_KEY = 'hussein_portfolio_admin_jwt';
 const GUESTBOOK_TOKENS_KEY = 'hussein_portfolio_my_gb_tokens';
 
+export interface ApiPortfolioProfileDto {
+  readonly id?: string;
+  readonly name: string;
+  readonly title: string;
+  readonly location: string;
+  readonly email: string;
+  readonly phone: string;
+  readonly githubUrl: string;
+  readonly linkedinUrl: string;
+  readonly dungeonAvatar: string;
+  readonly recruiterAvatar: string;
+  readonly summary: string;
+  readonly educationDegree: string;
+  readonly educationUniversity: string;
+  readonly educationGrade: string;
+  readonly cvFileUrl?: string | null;
+}
+
+export interface ApiBossActionDto {
+  readonly id: string;
+  readonly label: string;
+  readonly projectOrigin: string;
+  readonly impactDescription: string;
+  readonly damage: number;
+}
+
+export function mapProfileDtoToHero(
+  dto: ApiPortfolioProfileDto
+): HeroProfile & { readonly cvFileUrl?: string } {
+  return {
+    name: dto.name,
+    title: dto.title,
+    location: dto.location,
+    email: dto.email,
+    phone: dto.phone,
+    githubUrl: dto.githubUrl,
+    linkedinUrl: dto.linkedinUrl,
+    dungeonAvatar: dto.dungeonAvatar || '/assets/images/hussein-dungeon.jpg',
+    recruiterAvatar: dto.recruiterAvatar || '/assets/images/hussein-hr.png',
+    summary: dto.summary,
+    education: {
+      degree: dto.educationDegree,
+      university: dto.educationUniversity,
+      grade: dto.educationGrade,
+    },
+    cvFileUrl: dto.cvFileUrl ?? undefined,
+  };
+}
+
+export function mapBossActionDto(dto: ApiBossActionDto): BossDefenseAction {
+  return {
+    id: dto.id,
+    label: dto.label,
+    projectOrigin: dto.projectOrigin,
+    impactDescription: dto.impactDescription,
+    damage: dto.damage,
+  };
+}
 export interface ApiProjectDto {
   readonly id: string;
   readonly name: string;
@@ -390,6 +450,49 @@ export const portfolioApi = {
     await requestJson(`/guestbook/${id}`, {
       method: 'DELETE',
       headers,
+    });
+  },
+  // Profile & Hero Settings
+  async getProfile(): Promise<ApiPortfolioProfileDto> {
+    return requestJson<ApiPortfolioProfileDto>('/profile', { method: 'GET' });
+  },
+
+  async updateProfile(
+    payload: ApiPortfolioProfileDto
+  ): Promise<ApiPortfolioProfileDto> {
+    return requestJson<ApiPortfolioProfileDto>('/profile', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // System Design Challenge Actions
+  async getBossActions(): Promise<ApiBossActionDto[]> {
+    return requestJson<ApiBossActionDto[]>('/challenge', { method: 'GET' });
+  },
+
+  async createBossAction(
+    payload: Omit<ApiBossActionDto, 'id'>
+  ): Promise<{ id?: string; Id?: string }> {
+    return requestJson<{ id?: string; Id?: string }>('/challenge', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateBossAction(
+    id: string,
+    payload: ApiBossActionDto
+  ): Promise<void> {
+    await requestJson(`/challenge/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteBossAction(id: string): Promise<void> {
+    await requestJson(`/challenge/${id}`, {
+      method: 'DELETE',
     });
   },
 };

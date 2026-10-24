@@ -12,18 +12,18 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
     {
     }
 
-    public DbSet<Project> Projects { get; set; }
-    public DbSet<ProjectSpec> ProjectSpecs { get; set; }
-    public DbSet<ProjectTechStack> ProjectTechStacks { get; set; }
-    public DbSet<SkillCategory> SkillCategories { get; set; }
-    public DbSet<SkillItem> SkillItems { get; set; }
-    public DbSet<GuestbookEntry> GuestbookEntries { get; set; }
+    public DbSet<PortfolioProfile> PortfolioProfiles => Set<PortfolioProfile>();
+    public DbSet<Project> Projects => Set<Project>();
+    public DbSet<ProjectSpec> ProjectSpecs => Set<ProjectSpec>();
+    public DbSet<ProjectTechStack> ProjectTechStacks => Set<ProjectTechStack>();
+    public DbSet<SkillCategory> SkillCategories => Set<SkillCategory>();
+    public DbSet<SkillItem> SkillItems => Set<SkillItem>();
+    public DbSet<BossAction> BossActions => Set<BossAction>();
+    public DbSet<GuestbookEntry> GuestbookEntries => Set<GuestbookEntry>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
-
-        // Applies all Entity Configurations
         builder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
     }
 }

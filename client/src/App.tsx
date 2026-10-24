@@ -14,15 +14,19 @@ import { dungeonAudio } from './utils/dungeonAudio';
 import {
   portfolioApi,
   guestbookOwnership,
+  mapProfileDtoToHero,
   mapProjectDtoToRelic,
   mapCategoryDtoToRune,
+  mapBossActionDto,
   mapGuestbookDtoToEntry,
 } from './services/portfolioApi';
 import { createPortfolioHubConnection } from './services/signalrService';
 import type {
   ChamberId,
+  HeroProfile,
   ProjectRelic,
   SkillRune,
+  BossDefenseAction,
   GuestbookEntry,
   GhostExplorer,
 } from './types/dungeon.types';
@@ -71,10 +75,16 @@ export const App: React.FC = () => {
   const [isLumosActive, setIsLumosActive] = useState<boolean>(false);
   const [isArcaneVision, setIsArcaneVision] = useState<boolean>(false);
 
+  const [hero, setHero] = useState<
+    HeroProfile & { readonly cvFileUrl?: string }
+  >(HUSSEIN_DATA.hero);
   const [relics, setRelics] = useState<readonly ProjectRelic[]>(
     HUSSEIN_DATA.relics
   );
   const [runes, setRunes] = useState<readonly SkillRune[]>(HUSSEIN_DATA.runes);
+  const [bossActions, setBossActions] = useState<readonly BossDefenseAction[]>(
+    HUSSEIN_DATA.bossActions
+  );
   const [guestbookEntries, setGuestbookEntries] = useState<
     readonly GuestbookEntry[]
   >(HUSSEIN_DATA.initialGuestbook);
@@ -107,17 +117,25 @@ export const App: React.FC = () => {
 
   const syncLivePortfolioData = useCallback(async () => {
     try {
-      const [projDtos, catDtos, gbDtos] = await Promise.all([
+      const [profDto, projDtos, catDtos, actDtos, gbDtos] = await Promise.all([
+        portfolioApi.getProfile().catch(() => null),
         portfolioApi.getProjects(),
         portfolioApi.getSkillCategories(),
+        portfolioApi.getBossActions().catch(() => []),
         portfolioApi.getGuestbookEntries(),
       ]);
 
+      if (profDto) {
+        setHero(mapProfileDtoToHero(profDto));
+      }
       if (Array.isArray(projDtos) && projDtos.length > 0) {
         setRelics(projDtos.map(mapProjectDtoToRelic));
       }
       if (Array.isArray(catDtos) && catDtos.length > 0) {
         setRunes(catDtos.map(mapCategoryDtoToRune));
+      }
+      if (Array.isArray(actDtos) && actDtos.length > 0) {
+        setBossActions(actDtos.map(mapBossActionDto));
       }
       if (Array.isArray(gbDtos)) {
         setGuestbookEntries(gbDtos.map(mapGuestbookDtoToEntry));
@@ -422,7 +440,7 @@ export const App: React.FC = () => {
 
       <OnboardingModal
         isOpen={showOnboarding}
-        explorerAvatar={HUSSEIN_DATA.hero.dungeonAvatar}
+        explorerAvatar={hero.dungeonAvatar}
         onStartExploration={handleStartExploration}
         onSkipToFullLight={handleSkipToFullLight}
       />
@@ -457,8 +475,8 @@ export const App: React.FC = () => {
       )}
 
       <DungeonHeader
-        heroName={HUSSEIN_DATA.hero.name}
-        explorerAvatar={HUSSEIN_DATA.hero.dungeonAvatar}
+        heroName={hero.name}
+        explorerAvatar={hero.dungeonAvatar}
         litCount={litChambers.size}
         totalChambers={ALL_CHAMBERS.length}
         activeExplorersCount={activeExplorersCount}
@@ -473,7 +491,7 @@ export const App: React.FC = () => {
       />
 
       <OriginChamber
-        hero={HUSSEIN_DATA.hero}
+        hero={hero}
         isLit={isChamberLit('origin')}
         isIgniting={ignitingChambers.has('origin')}
         isLumosActive={isLumosActive}
@@ -498,7 +516,7 @@ export const App: React.FC = () => {
       />
 
       <BossChamber
-        bossActions={HUSSEIN_DATA.bossActions}
+        bossActions={bossActions}
         bossHp={bossHp}
         usedActions={usedActions}
         combatLog={combatLog}
@@ -509,7 +527,7 @@ export const App: React.FC = () => {
       />
 
       <TerminalChamber
-        hero={HUSSEIN_DATA.hero}
+        hero={hero}
         initialGuestbook={guestbookEntries}
         ownedEntryIds={ownedEntryIds}
         onSubmitGuestbookEntry={handleSubmitGuestbookEntry}

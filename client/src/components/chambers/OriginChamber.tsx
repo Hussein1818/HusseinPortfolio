@@ -101,7 +101,7 @@ export const OriginChamber: React.FC<OriginChamberProps> = React.memo(
               <div className="flex flex-wrap gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => void downloadOfficialCvPdf(onToast)}
+                  onClick={() => void downloadOfficialCvPdf(onToast, hero.cvFileUrl)}
                   className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-5 py-3 font-code text-xs font-extrabold text-black hover:from-amber-400 hover:to-amber-500 transition"
                 >
                   <FileDown className="h-4 w-4" />

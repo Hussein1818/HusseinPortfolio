@@ -532,7 +532,7 @@ export const TerminalChamber: React.FC<TerminalChamberProps> = React.memo(
                 <div className="mt-6 pt-4 border-t border-amber-900/50 flex flex-col gap-2.5">
                   <button
                     type="button"
-                    onClick={() => void downloadOfficialCvPdf(onToast)}
+                    onClick={() => void downloadOfficialCvPdf(onToast, hero.cvFileUrl)}
                     className="flex items-center justify-center gap-2 rounded-xl bg-amber-500 py-3.5 font-code text-xs font-extrabold text-black hover:bg-amber-400 transition"
                   >
                     <FileDown className="h-4 w-4" />

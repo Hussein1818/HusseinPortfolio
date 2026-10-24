@@ -7,9 +7,26 @@ const CANDIDATE_CV_PATHS = [
 ];
 
 export async function downloadOfficialCvPdf(
-  onErrorToast?: (msg: string) => void
+  onErrorToast?: (msg: string) => void,
+  customCvUrl?: string
 ): Promise<void> {
   dungeonAudio.playRuneCollect();
+
+  if (customCvUrl) {
+    if (customCvUrl.startsWith('data:application/pdf')) {
+      const link = document.createElement('a');
+      link.href = customCvUrl;
+      link.download = 'Hussein_Mohamed_CV.pdf';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
+    }
+    if (customCvUrl.startsWith('http://') || customCvUrl.startsWith('https://')) {
+      window.open(customCvUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+  }
 
   for (const path of CANDIDATE_CV_PATHS) {
     try {
@@ -35,7 +52,7 @@ export async function downloadOfficialCvPdf(
 
   if (onErrorToast) {
     onErrorToast(
-      'Please place Hussein_Mohamed_.NET_CV.pdf inside client/public/ folder!'
+      'Upload your CV PDF from the Admin Dashboard (Profile & Hero tab)!'
     );
   }
 }

@@ -9,19 +9,23 @@ import {
   Cpu,
   MessageSquare,
   ArrowLeft,
-  Sparkles,
   CheckCircle2,
   AlertTriangle,
   RefreshCw,
   Eye,
   EyeOff,
   Upload,
+  UserCheck,
+  Swords,
+  FileText,
 } from 'lucide-react';
 import {
   portfolioApi,
   tokenStorage,
+  type ApiPortfolioProfileDto,
   type ApiProjectDto,
   type ApiSkillCategoryDto,
+  type ApiBossActionDto,
   type ApiGuestbookEntryDto,
   type ProjectUpsertPayload,
 } from '../../services/portfolioApi';
@@ -32,7 +36,7 @@ interface AdminDashboardProps {
   readonly onDataMutated: () => Promise<void>;
 }
 
-type AdminTab = 'projects' | 'skills' | 'guestbook';
+type AdminTab = 'profile' | 'projects' | 'skills' | 'challenge' | 'guestbook';
 
 interface ProjectFormState {
   id?: string;
@@ -61,6 +65,23 @@ const EMPTY_PROJECT_FORM: ProjectFormState = {
   liveUrl: '',
   deepDiveSpecsText: '',
   techStacksText: '',
+};
+
+const DEFAULT_PROFILE_FORM: ApiPortfolioProfileDto = {
+  name: HUSSEIN_DATA.hero.name,
+  title: HUSSEIN_DATA.hero.title,
+  location: HUSSEIN_DATA.hero.location,
+  email: HUSSEIN_DATA.hero.email,
+  phone: HUSSEIN_DATA.hero.phone,
+  githubUrl: HUSSEIN_DATA.hero.githubUrl,
+  linkedinUrl: HUSSEIN_DATA.hero.linkedinUrl,
+  dungeonAvatar: HUSSEIN_DATA.hero.dungeonAvatar,
+  recruiterAvatar: HUSSEIN_DATA.hero.recruiterAvatar,
+  summary: HUSSEIN_DATA.hero.summary,
+  educationDegree: HUSSEIN_DATA.hero.education.degree,
+  educationUniversity: HUSSEIN_DATA.hero.education.university,
+  educationGrade: HUSSEIN_DATA.hero.education.grade,
+  cvFileUrl: '',
 };
 
 async function compressImageFileToDataUrl(file: File): Promise<string> {
@@ -99,6 +120,18 @@ async function compressImageFileToDataUrl(file: File): Promise<string> {
   });
 }
 
+async function readPdfFileToDataUrl(file: File): Promise<string> {
+  if (file.size > 4 * 1024 * 1024) {
+    throw new Error('PDF file size must be under 4 MB.');
+  }
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Failed to read PDF file.'));
+    reader.onload = () => resolve(reader.result as string);
+    reader.readAsDataURL(file);
+  });
+}
+
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onExitAdmin,
   onDataMutated,
@@ -117,21 +150,40 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
+  // Portfolio Entities State
+  const [profileForm, setProfileForm] =
+    useState<ApiPortfolioProfileDto>(DEFAULT_PROFILE_FORM);
   const [projects, setProjects] = useState<ApiProjectDto[]>([]);
   const [categories, setCategories] = useState<ApiSkillCategoryDto[]>([]);
+  const [bossActions, setBossActions] = useState<ApiBossActionDto[]>([]);
   const [guestbook, setGuestbook] = useState<ApiGuestbookEntryDto[]>([]);
 
+  // Project Form State
   const [projectForm, setProjectForm] =
     useState<ProjectFormState>(EMPTY_PROJECT_FORM);
   const [isEditingProject, setIsEditingProject] = useState<boolean>(false);
 
+  // Skill Category & Item Form State
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [categoryName, setCategoryName] = useState<string>('');
   const [categoryRune, setCategoryRune] = useState<string>('⚡');
-
   const [selectedCategoryIdForSkill, setSelectedCategoryIdForSkill] =
     useState<string>('');
   const [newSkillName, setNewSkillName] = useState<string>('');
+
+  // Challenge Action Form State
+  const [editingActionId, setEditingActionId] = useState<string | null>(null);
+  const [actionLabel, setActionLabel] = useState<string>('');
+  const [actionOrigin, setActionOrigin] = useState<string>('');
+  const [actionImpact, setActionImpact] = useState<string>('');
+  const [actionDamage, setActionDamage] = useState<number>(35);
+
+  useEffect(() => {
+    document.body.classList.add('admin-mode');
+    return () => {
+      document.body.classList.remove('admin-mode');
+    };
+  }, []);
 
   const showBanner = useCallback((type: 'success' | 'error', text: string) => {
     setStatusBanner({ type, text });
@@ -139,14 +191,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const fetchAllAdminData = useCallback(async () => {
     try {
-      const [projData, catData, gbData] = await Promise.all([
+      const [profData, projData, catData, actData, gbData] = await Promise.all([
+        portfolioApi.getProfile().catch(() => null),
         portfolioApi.getProjects(),
         portfolioApi.getSkillCategories(),
+        portfolioApi.getBossActions().catch(() => []),
         portfolioApi.getGuestbookEntries(),
       ]);
+
+      if (profData) {
+        setProfileForm(profData);
+      }
       setProjects(projData);
       setCategories(catData);
+      setBossActions(actData);
       setGuestbook(gbData);
+
       if (catData.length > 0 && !selectedCategoryIdForSkill) {
         setSelectedCategoryIdForSkill(catData[0].id);
       }
@@ -208,68 +268,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setAdminEmail('');
   };
 
-  const handleSeedInitialData = async () => {
+  // Profile Handler
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
     setIsSubmitting(true);
     setStatusBanner(null);
     try {
-      for (const relic of HUSSEIN_DATA.relics) {
-        const exists = projects.some(
-          (p) => p.name.toLowerCase() === relic.name.toLowerCase()
-        );
-        if (!exists) {
-          await portfolioApi.createProject({
-            name: relic.name,
-            role: relic.role,
-            period: relic.period,
-            type: relic.type,
-            imageUrl: relic.imageUrl,
-            secretArchitecture: relic.secretArchitecture,
-            schemaDiagram: relic.schemaDiagram,
-            description: relic.description,
-            liveUrl: relic.liveUrl ?? null,
-            deepDiveSpecs: [...relic.deepDiveSpecs],
-            techStacks: [...relic.stack],
-          });
-        }
-      }
-
-      for (const rune of HUSSEIN_DATA.runes) {
-        const existingCat = categories.find(
-          (c) => c.name.toLowerCase() === rune.category.toLowerCase()
-        );
-        let targetCatId = existingCat?.id;
-
-        if (!targetCatId) {
-          const created = await portfolioApi.createSkillCategory(
-            rune.category,
-            rune.runeSymbol
-          );
-          targetCatId = created.id || created.Id;
-        }
-
-        if (targetCatId) {
-          for (const skillName of rune.items) {
-            await portfolioApi.createSkillItem(targetCatId, skillName);
-          }
-        }
-      }
-
-      await fetchAllAdminData();
+      const updated = await portfolioApi.updateProfile(profileForm);
+      setProfileForm(updated);
       await onDataMutated();
-      showBanner(
-        'success',
-        'Default portfolio projects and skills seeded to SQL Server!'
-      );
+      showBanner('success', 'Profile, avatars, and CV updated successfully!');
     } catch (err) {
       showBanner(
         'error',
-        err instanceof Error ? err.message : 'Failed to seed initial data.'
+        err instanceof Error ? err.message : 'Failed to update profile.'
       );
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // Project Handlers
   const handleSaveProject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!projectForm.imageUrl.trim()) {
@@ -360,6 +379,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  // Skill Handlers
   const handleSaveCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -451,6 +471,64 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  // Challenge Action Handlers
+  const handleSaveBossAction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      if (editingActionId) {
+        await portfolioApi.updateBossAction(editingActionId, {
+          id: editingActionId,
+          label: actionLabel.trim(),
+          projectOrigin: actionOrigin.trim(),
+          impactDescription: actionImpact.trim(),
+          damage: Number(actionDamage),
+        });
+        showBanner('success', 'Challenge countermeasure updated.');
+      } else {
+        await portfolioApi.createBossAction({
+          label: actionLabel.trim(),
+          projectOrigin: actionOrigin.trim(),
+          impactDescription: actionImpact.trim(),
+          damage: Number(actionDamage),
+        });
+        showBanner('success', 'Challenge countermeasure created.');
+      }
+      setEditingActionId(null);
+      setActionLabel('');
+      setActionOrigin('');
+      setActionImpact('');
+      setActionDamage(35);
+      await fetchAllAdminData();
+      await onDataMutated();
+    } catch (err) {
+      showBanner(
+        'error',
+        err instanceof Error ? err.message : 'Failed to save challenge action.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteBossAction = async (id: string, label: string) => {
+    if (!window.confirm(`Delete countermeasure "${label}"?`)) return;
+    setIsSubmitting(true);
+    try {
+      await portfolioApi.deleteBossAction(id);
+      showBanner('success', 'Challenge countermeasure deleted.');
+      await fetchAllAdminData();
+      await onDataMutated();
+    } catch (err) {
+      showBanner(
+        'error',
+        err instanceof Error ? err.message : 'Failed to delete action.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleDeleteGuestbookEntry = async (id: string) => {
     setIsSubmitting(true);
     try {
@@ -518,10 +596,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <input
                 type="email"
                 required
+                autoComplete="username"
                 value={loginEmail}
                 onChange={(e) => setLoginEmail(e.target.value)}
-                placeholder="issehs023@gmail.com"
-                className="w-full rounded-xl border border-amber-900/60 bg-black px-3.5 py-2.5 text-amber-100 focus:border-amber-400 focus:outline-none"
+                placeholder="Enter your email"
+                className="w-full rounded-xl border border-amber-900/60 bg-black px-3.5 py-2.5 text-amber-100 placeholder-amber-700/50 focus:border-amber-400 focus:outline-none"
               />
             </div>
 
@@ -531,10 +610,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
+                  autoComplete="current-password"
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}
-                  placeholder="••••••••••••"
-                  className="w-full rounded-xl border border-amber-900/60 bg-black pl-3.5 pr-10 py-2.5 text-amber-100 focus:border-amber-400 focus:outline-none"
+                  placeholder="Enter your password"
+                  className="w-full rounded-xl border border-amber-900/60 bg-black pl-3.5 pr-10 py-2.5 text-amber-100 placeholder-amber-700/50 focus:border-amber-400 focus:outline-none"
                 />
                 <button
                   type="button"
@@ -575,22 +655,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 ADMIN: {adminEmail}
               </span>
               <h1 className="text-lg font-extrabold text-amber-100">
-                PORTFOLIO DASHBOARD
+                PORTFOLIO CONTROL DASHBOARD
               </h1>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5 font-code text-xs">
-            <button
-              type="button"
-              disabled={isSubmitting}
-              onClick={handleSeedInitialData}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-purple-500/60 bg-purple-950/50 px-3.5 py-2 font-bold text-purple-200 hover:bg-purple-900/70 transition disabled:opacity-50"
-            >
-              <Sparkles className="h-4 w-4 text-purple-300" />
-              <span>Seed Default Portfolio Data</span>
-            </button>
-
             <button
               type="button"
               onClick={() => void fetchAllAdminData()}
@@ -651,6 +721,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <div className="flex flex-wrap gap-3 border-b border-amber-900/40 pb-4 font-code text-xs">
           <button
             type="button"
+            onClick={() => setActiveTab('profile')}
+            className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 font-bold transition ${
+              activeTab === 'profile'
+                ? 'border-amber-400 bg-amber-500 text-black'
+                : 'border-amber-900/50 bg-[#120e0a] text-amber-200 hover:border-amber-500'
+            }`}
+          >
+            <UserCheck className="h-4 w-4" />
+            <span>PROFILE, AVATARS &amp; CV</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('projects')}
             className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 font-bold transition ${
               activeTab === 'projects'
@@ -672,7 +755,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             }`}
           >
             <Cpu className="h-4 w-4" />
-            <span>SKILL CATEGORIES ({categories.length})</span>
+            <span>SKILLS ({categories.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('challenge')}
+            className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 font-bold transition ${
+              activeTab === 'challenge'
+                ? 'border-amber-400 bg-amber-500 text-black'
+                : 'border-amber-900/50 bg-[#120e0a] text-amber-200 hover:border-amber-500'
+            }`}
+          >
+            <Swords className="h-4 w-4" />
+            <span>SYSTEM CHALLENGE ({bossActions.length})</span>
           </button>
 
           <button
@@ -688,6 +784,319 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <span>GUESTBOOK ({guestbook.length})</span>
           </button>
         </div>
+
+        {activeTab === 'profile' && (
+          <form
+            onSubmit={handleSaveProfile}
+            className="rounded-3xl border border-amber-700/50 bg-[#0e0b08] p-6 sm:p-8 space-y-6 font-code text-xs"
+          >
+            <h2 className="text-base font-extrabold text-amber-100 border-b border-amber-900/40 pb-3">
+              EDIT HERO PROFILE, AVATARS, EDUCATION &amp; CV
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="rounded-2xl border border-amber-800/50 bg-black/60 p-4 space-y-3">
+                <label className="block font-bold text-amber-300">
+                  Explorer Avatar (Torch Mode &amp; Header Logo)
+                </label>
+                <div className="flex items-center gap-4">
+                  <img
+                    src={profileForm.dungeonAvatar}
+                    alt="Explorer Avatar"
+                    className="h-20 w-20 rounded-2xl border-2 border-amber-500 object-cover object-top bg-black shrink-0"
+                  />
+                  <label className="cursor-pointer inline-flex items-center gap-2 rounded-xl border border-amber-500/60 bg-amber-950/40 px-3.5 py-2.5 text-amber-200 hover:bg-amber-500 hover:text-black transition">
+                    <Upload className="h-4 w-4" />
+                    <span>Upload Explorer Photo</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        try {
+                          const dataUrl = await compressImageFileToDataUrl(file);
+                          setProfileForm((prev) => ({
+                            ...prev,
+                            dungeonAvatar: dataUrl,
+                          }));
+                        } catch (err) {
+                          showBanner(
+                            'error',
+                            err instanceof Error
+                              ? err.message
+                              : 'Upload failed.'
+                          );
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-amber-800/50 bg-black/60 p-4 space-y-3">
+                <label className="block font-bold text-amber-300">
+                  Recruiter Avatar (Full Light Mode)
+                </label>
+                <div className="flex items-center gap-4">
+                  <img
+                    src={profileForm.recruiterAvatar}
+                    alt="Recruiter Avatar"
+                    className="h-20 w-20 rounded-2xl border-2 border-amber-500 object-cover object-top bg-black shrink-0"
+                  />
+                  <label className="cursor-pointer inline-flex items-center gap-2 rounded-xl border border-amber-500/60 bg-amber-950/40 px-3.5 py-2.5 text-amber-200 hover:bg-amber-500 hover:text-black transition">
+                    <Upload className="h-4 w-4" />
+                    <span>Upload Standard Photo</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        try {
+                          const dataUrl = await compressImageFileToDataUrl(file);
+                          setProfileForm((prev) => ({
+                            ...prev,
+                            recruiterAvatar: dataUrl,
+                          }));
+                        } catch (err) {
+                          showBanner(
+                            'error',
+                            err instanceof Error
+                              ? err.message
+                              : 'Upload failed.'
+                          );
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-amber-800/50 bg-black/60 p-4 space-y-3">
+                <label className="block font-bold text-amber-300">
+                  Official CV (.PDF File Upload)
+                </label>
+                <div className="flex flex-col gap-2">
+                  <label className="cursor-pointer inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500/60 bg-emerald-950/40 px-3.5 py-2.5 text-emerald-200 hover:bg-emerald-500 hover:text-black transition">
+                    <FileText className="h-4 w-4" />
+                    <span>Upload CV (.PDF)</span>
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        try {
+                          const pdfDataUrl = await readPdfFileToDataUrl(file);
+                          setProfileForm((prev) => ({
+                            ...prev,
+                            cvFileUrl: pdfDataUrl,
+                          }));
+                          showBanner(
+                            'success',
+                            `PDF "${file.name}" attached. Click SAVE PROFILE CHANGES below.`
+                          );
+                        } catch (err) {
+                          showBanner(
+                            'error',
+                            err instanceof Error
+                              ? err.message
+                              : 'PDF upload failed.'
+                          );
+                        }
+                      }}
+                    />
+                  </label>
+                  <span className="text-[11px] text-amber-200/70">
+                    {profileForm.cvFileUrl
+                      ? '✔ Custom CV PDF attached in database'
+                      : 'Using default public folder CV fallback'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label className="block mb-1 text-amber-300">Full Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={profileForm.name}
+                  onChange={(e) =>
+                    setProfileForm({ ...profileForm, name: e.target.value })
+                  }
+                  className="w-full rounded-xl border border-amber-900/60 bg-black px-3 py-2 text-amber-100"
+                />
+              </div>
+              <div>
+                <label className="block mb-1 text-amber-300">Job Title *</label>
+                <input
+                  type="text"
+                  required
+                  value={profileForm.title}
+                  onChange={(e) =>
+                    setProfileForm({ ...profileForm, title: e.target.value })
+                  }
+                  className="w-full rounded-xl border border-amber-900/60 bg-black px-3 py-2 text-amber-100"
+                />
+              </div>
+              <div>
+                <label className="block mb-1 text-amber-300">Location *</label>
+                <input
+                  type="text"
+                  required
+                  value={profileForm.location}
+                  onChange={(e) =>
+                    setProfileForm({ ...profileForm, location: e.target.value })
+                  }
+                  className="w-full rounded-xl border border-amber-900/60 bg-black px-3 py-2 text-amber-100"
+                />
+              </div>
+              <div>
+                <label className="block mb-1 text-amber-300">
+                  Public Email *
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={profileForm.email}
+                  onChange={(e) =>
+                    setProfileForm({ ...profileForm, email: e.target.value })
+                  }
+                  className="w-full rounded-xl border border-amber-900/60 bg-black px-3 py-2 text-amber-100"
+                />
+              </div>
+              <div>
+                <label className="block mb-1 text-amber-300">Phone *</label>
+                <input
+                  type="text"
+                  required
+                  value={profileForm.phone}
+                  onChange={(e) =>
+                    setProfileForm({ ...profileForm, phone: e.target.value })
+                  }
+                  className="w-full rounded-xl border border-amber-900/60 bg-black px-3 py-2 text-amber-100"
+                />
+              </div>
+              <div>
+                <label className="block mb-1 text-amber-300">
+                  GitHub URL *
+                </label>
+                <input
+                  type="url"
+                  required
+                  value={profileForm.githubUrl}
+                  onChange={(e) =>
+                    setProfileForm({
+                      ...profileForm,
+                      githubUrl: e.target.value,
+                    })
+                  }
+                  className="w-full rounded-xl border border-amber-900/60 bg-black px-3 py-2 text-amber-100"
+                />
+              </div>
+              <div className="sm:col-span-2 lg:col-span-3">
+                <label className="block mb-1 text-amber-300">
+                  LinkedIn URL *
+                </label>
+                <input
+                  type="url"
+                  required
+                  value={profileForm.linkedinUrl}
+                  onChange={(e) =>
+                    setProfileForm({
+                      ...profileForm,
+                      linkedinUrl: e.target.value,
+                    })
+                  }
+                  className="w-full rounded-xl border border-amber-900/60 bg-black px-3 py-2 text-amber-100"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block mb-1 text-amber-300">
+                About / Professional Summary *
+              </label>
+              <textarea
+                rows={3}
+                required
+                value={profileForm.summary}
+                onChange={(e) =>
+                  setProfileForm({ ...profileForm, summary: e.target.value })
+                }
+                className="w-full rounded-xl border border-amber-900/60 bg-black px-3 py-2 text-amber-100"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block mb-1 text-amber-300">
+                  Education Degree *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={profileForm.educationDegree}
+                  onChange={(e) =>
+                    setProfileForm({
+                      ...profileForm,
+                      educationDegree: e.target.value,
+                    })
+                  }
+                  className="w-full rounded-xl border border-amber-900/60 bg-black px-3 py-2 text-amber-100"
+                />
+              </div>
+              <div>
+                <label className="block mb-1 text-amber-300">
+                  University *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={profileForm.educationUniversity}
+                  onChange={(e) =>
+                    setProfileForm({
+                      ...profileForm,
+                      educationUniversity: e.target.value,
+                    })
+                  }
+                  className="w-full rounded-xl border border-amber-900/60 bg-black px-3 py-2 text-amber-100"
+                />
+              </div>
+              <div>
+                <label className="block mb-1 text-amber-300">
+                  Grade &amp; GPA *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={profileForm.educationGrade}
+                  onChange={(e) =>
+                    setProfileForm({
+                      ...profileForm,
+                      educationGrade: e.target.value,
+                    })
+                  }
+                  className="w-full rounded-xl border border-amber-900/60 bg-black px-3 py-2 text-amber-100"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full sm:w-auto rounded-xl bg-amber-500 px-8 py-3 font-extrabold text-black hover:bg-amber-400 transition disabled:opacity-50"
+            >
+              {isSubmitting ? 'SAVING...' : 'SAVE PROFILE CHANGES'}
+            </button>
+          </form>
+        )}
 
         {activeTab === 'projects' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -938,76 +1347,68 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </form>
 
             <div className="lg:col-span-7 space-y-4">
-              {projects.length === 0 ? (
-                <div className="rounded-3xl border border-amber-900/40 bg-[#0e0b08] p-8 text-center font-code text-xs text-amber-300/80">
-                  No projects in SQL Server yet. Click &quot;Seed Default
-                  Portfolio Data&quot; in the top bar or create one using the
-                  form.
-                </div>
-              ) : (
-                projects.map((proj) => (
-                  <div
-                    key={proj.id}
-                    className="rounded-2xl border border-amber-800/50 bg-[#0e0b08] p-5 flex flex-col justify-between gap-4"
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="flex items-center gap-3.5">
-                        {proj.imageUrl && (
-                          <img
-                            src={proj.imageUrl}
-                            alt={proj.name}
-                            className="h-14 w-14 rounded-xl border border-amber-500/40 object-cover bg-black shrink-0"
-                          />
-                        )}
-                        <div>
-                          <span className="font-code text-xs text-amber-400">
-                            {proj.role} • {proj.period}
-                          </span>
-                          <h3 className="text-xl font-extrabold text-amber-50">
-                            {proj.name}
-                          </h3>
-                          <p className="font-code text-xs text-emerald-400">
-                            {proj.type}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 font-code text-xs">
-                        <button
-                          type="button"
-                          onClick={() => handleEditProjectClick(proj)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-amber-500/50 bg-amber-950/40 px-3 py-1.5 text-amber-200 hover:bg-amber-500 hover:text-black"
-                        >
-                          <Edit3 className="h-3.5 w-3.5" />
-                          <span>Edit</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void handleDeleteProject(proj.id, proj.name)
-                          }
-                          className="inline-flex items-center gap-1 rounded-lg border border-red-600/50 bg-red-950/40 px-3 py-1.5 text-red-200 hover:bg-red-600 hover:text-white"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          <span>Delete</span>
-                        </button>
+              {projects.map((proj) => (
+                <div
+                  key={proj.id}
+                  className="rounded-2xl border border-amber-800/50 bg-[#0e0b08] p-5 flex flex-col justify-between gap-4"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex items-center gap-3.5">
+                      {proj.imageUrl && (
+                        <img
+                          src={proj.imageUrl}
+                          alt={proj.name}
+                          className="h-14 w-14 rounded-xl border border-amber-500/40 object-cover bg-black shrink-0"
+                        />
+                      )}
+                      <div>
+                        <span className="font-code text-xs text-amber-400">
+                          {proj.role} • {proj.period}
+                        </span>
+                        <h3 className="text-xl font-extrabold text-amber-50">
+                          {proj.name}
+                        </h3>
+                        <p className="font-code text-xs text-emerald-400">
+                          {proj.type}
+                        </p>
                       </div>
                     </div>
-
-                    <p className="text-xs text-[#d8cebc]">{proj.description}</p>
-
-                    <div className="flex flex-wrap gap-1.5">
-                      {(proj.techStacks ?? []).map((t) => (
-                        <span
-                          key={t}
-                          className="rounded border border-amber-800/50 bg-black px-2 py-0.5 font-code text-[11px] text-amber-300"
-                        >
-                          {t}
-                        </span>
-                      ))}
+                    <div className="flex items-center gap-2 font-code text-xs">
+                      <button
+                        type="button"
+                        onClick={() => handleEditProjectClick(proj)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-amber-500/50 bg-amber-950/40 px-3 py-1.5 text-amber-200 hover:bg-amber-500 hover:text-black"
+                      >
+                        <Edit3 className="h-3.5 w-3.5" />
+                        <span>Edit</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void handleDeleteProject(proj.id, proj.name)
+                        }
+                        className="inline-flex items-center gap-1 rounded-lg border border-red-600/50 bg-red-950/40 px-3 py-1.5 text-red-200 hover:bg-red-600 hover:text-white"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span>Delete</span>
+                      </button>
                     </div>
                   </div>
-                ))
-              )}
+
+                  <p className="text-xs text-[#d8cebc]">{proj.description}</p>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {(proj.techStacks ?? []).map((t) => (
+                      <span
+                        key={t}
+                        className="rounded border border-amber-800/50 bg-black px-2 py-0.5 font-code text-[11px] text-amber-300"
+                      >
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -1183,6 +1584,149 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </button>
                       </span>
                     ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'challenge' && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <form
+              onSubmit={handleSaveBossAction}
+              className="lg:col-span-5 rounded-3xl border border-amber-700/50 bg-[#0e0b08] p-6 space-y-4 font-code text-xs h-fit"
+            >
+              <div className="flex items-center justify-between border-b border-amber-900/40 pb-3">
+                <h2 className="text-sm font-extrabold text-amber-100">
+                  {editingActionId
+                    ? 'UPDATE COUNTERMEASURE'
+                    : 'ADD SYSTEM COUNTERMEASURE'}
+                </h2>
+                {editingActionId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingActionId(null);
+                      setActionLabel('');
+                      setActionOrigin('');
+                      setActionImpact('');
+                      setActionDamage(35);
+                    }}
+                    className="text-amber-400 underline"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+
+              <div>
+                <label className="block mb-1 text-amber-300">
+                  Action Label *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={actionLabel}
+                  onChange={(e) => setActionLabel(e.target.value)}
+                  placeholder="Deploy Optimistic Concurrency Control"
+                  className="w-full rounded-xl border border-amber-900/60 bg-black px-3 py-2 text-amber-100"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block mb-1 text-amber-300">
+                    Project Origin *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={actionOrigin}
+                    onChange={(e) => setActionOrigin(e.target.value)}
+                    placeholder="SH-Supplements"
+                    className="w-full rounded-xl border border-amber-900/60 bg-black px-3 py-2 text-amber-100"
+                  />
+                </div>
+                <div>
+                  <label className="block mb-1 text-amber-300">
+                    Bottleneck Damage (%) *
+                  </label>
+                  <input
+                    type="number"
+                    min={5}
+                    max={100}
+                    required
+                    value={actionDamage}
+                    onChange={(e) => setActionDamage(Number(e.target.value))}
+                    className="w-full rounded-xl border border-amber-900/60 bg-black px-3 py-2 text-amber-100"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block mb-1 text-amber-300">
+                  Impact Description *
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  value={actionImpact}
+                  onChange={(e) => setActionImpact(e.target.value)}
+                  placeholder="Eliminated race conditions and prevented flash-sale overselling..."
+                  className="w-full rounded-xl border border-amber-900/60 bg-black px-3 py-2 text-amber-100"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full rounded-xl bg-amber-500 py-3 font-extrabold text-black hover:bg-amber-400"
+              >
+                {editingActionId
+                  ? 'SAVE COUNTERMEASURE'
+                  : 'ADD COUNTERMEASURE'}
+              </button>
+            </form>
+
+            <div className="lg:col-span-7 space-y-3">
+              {bossActions.map((act) => (
+                <div
+                  key={act.id}
+                  className="rounded-2xl border border-amber-800/50 bg-[#0e0b08] p-5 flex items-center justify-between gap-4 font-code text-xs"
+                >
+                  <div className="space-y-1">
+                    <span className="text-amber-400 font-bold">
+                      [{act.projectOrigin}] • -{act.damage}% Bottleneck HP
+                    </span>
+                    <h3 className="text-sm font-extrabold text-amber-50">
+                      {act.label}
+                    </h3>
+                    <p className="text-amber-100/80">{act.impactDescription}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingActionId(act.id);
+                        setActionLabel(act.label);
+                        setActionOrigin(act.projectOrigin);
+                        setActionImpact(act.impactDescription);
+                        setActionDamage(act.damage);
+                      }}
+                      className="rounded-lg border border-amber-500/50 px-3 py-1.5 text-amber-200 hover:bg-amber-500 hover:text-black"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void handleDeleteBossAction(act.id, act.label)
+                      }
+                      className="rounded-lg border border-red-600/50 px-3 py-1.5 text-red-200 hover:bg-red-600 hover:text-white"
+                    >
+                      Delete
+                    </button>
                   </div>
                 </div>
               ))}
